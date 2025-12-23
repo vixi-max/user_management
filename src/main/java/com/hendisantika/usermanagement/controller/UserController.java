@@ -1,5 +1,6 @@
 package com.hendisantika.usermanagement.controller;
-
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import com.hendisantika.usermanagement.dto.ChangePasswordForm;
 import com.hendisantika.usermanagement.entity.Role;
 import com.hendisantika.usermanagement.entity.User;
@@ -147,16 +148,23 @@ public class UserController {
         return "user-form/user-view";
     }
 
-    @GetMapping("/editUser/{id}")
-    public String getEditUserForm(Model model, @PathVariable(name = "id") Long id) throws Exception {
-        User userToEdit = userService.getUserById(id);
-        log.info("Show  user-edit page.");
-        baseAttributeForUserForm(model, userToEdit, TAB_FORM);
-        model.addAttribute("editMode", "true");
-        model.addAttribute("passwordForm", new ChangePasswordForm(id));
 
-        return "user-form/user-view";
+    @GetMapping("/editUser/{id}")
+    public String getEditUserForm(Model model, @PathVariable(name = "id") Long id) {
+        try {
+            User userToEdit = userService.getUserById(id);
+            baseAttributeForUserForm(model, userToEdit, TAB_FORM);
+            model.addAttribute("editMode", "true");
+            model.addAttribute("passwordForm", new ChangePasswordForm(id));
+            return "user-form/user-view";
+        } catch (UsernameOrIdNotFound e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found", e);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error fetching user", e);
+        }
     }
+
+
 
     @PostMapping("/editUser")
     public String postEditUserForm(@Valid @ModelAttribute("userForm") User user, BindingResult result, Model model) {
@@ -215,5 +223,7 @@ public class UserController {
         }
         return ResponseEntity.ok("Success");
     }
+
+
 
 }

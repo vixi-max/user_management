@@ -2,42 +2,47 @@ package com.hendisantika.usermanagement.service;
 
 import com.hendisantika.usermanagement.entity.Role;
 import com.hendisantika.usermanagement.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.hendisantika.usermanagement.entity.User; // <-- ton entité JPA
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-/**
- * Created by IntelliJ IDEA.
- * Project : user-management
- */
 @Service
 @Transactional
 public class UserDetailsServiceImpl implements UserDetailsService {
-    @Autowired
-    private UserRepository userRepository;
+
+    private final UserRepository userRepository;
+
+    public UserDetailsServiceImpl(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // On récupère l'utilisateur depuis la base de données
+        User appUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Login Username Invalid."));
 
-        com.hendisantika.usermanagement.entity.User appUser =
-                userRepository.findByUsername(username).orElseThrow(() -> new UsernameNotFoundException("Login " +
-                        "Username Invalid."));
+        // On transforme les rôles en GrantedAuthority pour Spring Security
+        Set<GrantedAuthority> authorities = appUser.getRoles()
+                .stream()
+                .map(role -> new SimpleGrantedAuthority(role.getDescription()))
+                .collect(Collectors.toSet());
 
-        Set<GrantedAuthority> grantList = new HashSet<GrantedAuthority>();
-        for (Role role : appUser.getRoles()) {
-            GrantedAuthority grantedAuthority = new SimpleGrantedAuthority(role.getDescription());
-            grantList.add(grantedAuthority);
-        }
-
-        return new User(username, appUser.getPassword(), grantList);
+        // On retourne un UserDetails compatible Spring Security
+        return org.springframework.security.core.userdetails.User
+                .builder()
+                .username(appUser.getUsername())
+                .password(appUser.getPassword())
+                .authorities(authorities)
+                .build();
     }
 }
+
